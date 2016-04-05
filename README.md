@@ -1,4 +1,0 @@
-geolocart
-========
-
-geolocate articles
