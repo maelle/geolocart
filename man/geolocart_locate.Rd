@@ -2,23 +2,21 @@
 % Please edit documentation in R/locate.R
 \name{geolocart_locate}
 \alias{geolocart_locate}
-\title{Find locations in text and returns corresponding countries}
+\title{Find locations in text}
 \usage{
-geolocart_locate(text, geonameUser)
+geolocart_locate(text)
 }
 \arguments{
 \item{text}{a string}
-
-\item{geonameUser}{your geoname username}
 }
 \value{
 vector of countries
 }
 \description{
-Find locations in text and returns corresponding countries
+Find locations in text
 }
 \examples{
 text <- "I live in Barcelona but I was born in Vannes and I have worked in Berlin in the past."
-geolocart_locate(text, "insertYourName")
+geolocart_locate(text)
 }
 

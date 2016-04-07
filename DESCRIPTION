@@ -1,10 +1,20 @@
 Package: geolocart
 Title: Geolocate Articles
 Version: 0.0.0.9000
-Authors@R: person("First", "Last", email = "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+Authors@R: c(
+  person("Maëlle", "Salmon", role=c("aut", "cre"),
+         email="maelle.salmon@yahoo.se"),
+  person("Scott", "Chamberlain", role="aut"))
+Description: The Package Aims at Geoloparsing Scientific Articles.
 Depends:
     R (>= 3.2.3)
-License: What license is it under?
+Imports:
+   geonames,
+   NLP,
+   openNLP,
+   openNLPmodels.en
+License:  GPL (>= 2)
+URL: http://github.com/ropenscilabs/geolocart
+BugReports: http://github.com/ropenscilabs/geolocart/issues
 LazyData: true
 RoxygenNote: 5.0.1
