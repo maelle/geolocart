@@ -1,0 +1,143 @@
+---
+title: "Proof of concept, geoparsing scientific articles in R"
+author: "M. Salmon"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{R Package ropenaq}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, echo = FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  message = FALSE,
+  warning = FALSE,
+  cache = TRUE
+)
+```
+
+# Introduction
+
+Goal of the package/workflow: attribute a location to an article. Possible applications are:
+
+* Using RISmed, look at countries in abstracts, titles and affilations from publications about PM2.5. Note that from this only affiliation of the 1st author until 2013 or so. Afterwards affiliations of all authors.
+
+* Compare locations found in abstracts with species names as queries (RISmed or something else, query = "name of squirrel species") with locations for the same species name found with rgbif?
+
+* Countries, time and gender of authors (https://cran.r-project.org/web/packages/gender/index.html -- depending on how well it works for non English names).
+
+rOpenSci is the perfect home for such a package since it has so many packages for literature access.
+
+Currently we shall focus on the title and abstract, because maybe if a location is presented in these parts of an article, this place is important. But later, one could use the full text and calculate the frequency of occurrences of given locations, or the place in which they appear (the location of a study is quite prone to appear in Methods, while other studies might be discussed in Discussion).
+
+In this document I'll look at different possibilities for getting locations out of text. They are:
+
+## Solution 1
+
+* using `monkeylearn` entity recognition extractor and use the LOCATION tags.
+
+* then using `opencage` for geocoding the locations.
+
+Pros of solution 1: could be adapted to other entity recognition extractors (not from `OpenNLP` given the installation issues, but maybe [`spacyr`](https://github.com/kbenoit/spacyr) although you need Python for that as far as I know), and other geocoders.
+
+Cons of solution 1: Opencage is not free. Ambiguous locations.
+
+## Solution 2
+
+* using `geoparser`.
+
+Pros of solution 2: all in one step.
+
+Cons of solution 2: well the API is not free either (any scientific project could have funds for software, but obviously this still makes the workflow less accessible). Also, if the texts usually geotagged are not scientific texts, maybe it's not optimal.
+
+Solutions that won't be tested here include trying to install [CLAVIN](https://github.com/Berico-Technologies/CLAVIN) because it is a Java thing. Furthermore CLAVIN contributors include geoparser.io creator, so we can hope both have similar functionalities?
+
+# Proof-of-concept on the example of squirrels
+
+_because it's Sunday and squirrels are cute._
+
+## Get articles using `fulltext`
+
+```{r}
+library("fulltext")
+library("xml2")
+library("monkeylearn")
+library("opencage")
+library("geoparser")
+library("dplyr")
+library("leaflet")
+res1 <- ft_search(query = 'Sciurus vulgaris', from = 'plos')
+x <- ft_get(res1)
+squirrels <- x %>% chunks(c("title", "abstract")) %>%
+  tabularize() %>% .$plos
+knitr::kable(squirrels)
+
+```
+
+We will only use the abstracts in the examples.
+
+## Using `monkeylearn` and `opencage`
+
+Using `opencage` on say "France", one gets many results, so dealing with ambiguous results will be a big part of the work. In this document, we shall only use the first result from `opencage` which indeed is a bit arbitrary.
+
+```{r}
+squirrels$text_md5 <- vapply(X=squirrels$abstract,
+                         FUN=digest::digest,
+                         FUN.VALUE=character(1),
+                         USE.NAMES=FALSE,
+                         algo = "md5")
+# find locations
+locations <- monkeylearn_extract(request = squirrels$abstract,
+                                 extractor_id = "ex_isnnZRbS")
+locations <- filter(locations, tag == "LOCATION")
+
+
+# join to the original table
+solution1 <- left_join(squirrels, locations, by = "text_md5")
+knitr::kable(solution1 %>% select(-abstract))
+
+# geocoding
+library("purrr")
+solution1 <- solution1 %>%
+  by_row(function(x){
+    result <- opencage_forward(x$entity)
+    result <- result$result
+    result[1,]})
+
+library("tidyr")
+solution1 <- unnest(solution1, .out)
+
+# map
+leaflet(data = solution1) %>% addTiles() %>%
+  addMarkers(~geometry.lng, ~geometry.lat, popup = ~as.character(title))
+
+```
+
+So it kind of works, but there would be a lot of work required for choosing a better way to identify locations in text (is this `monleylearn` extractor the best choice?),
+and in assigning them a longitude and latitude or bounding box.
+
+## using `geoparser`
+
+```{r}
+solution2 <- squirrels %>%
+  by_row(function(x){
+    result <- geoparser_q(x$abstract)
+    result <- result$results
+    result <- select(result, - text_md5)
+    result[1,]})
+
+solution2 <- unnest(solution2, .out)
+knitr::kable(solution2 %>% select(- abstract))
+# map
+leaflet(data = solution2) %>% addTiles() %>%
+  addMarkers(~longitude, ~latitude, popup = ~as.character(title))
+```
+
+I guess this looks easier...
+
+* How to choose the best workflow? Data to validate one? How difficult should it be to install a package, how expensive should a webservice be?
+
+* Is it doable to develop an example with e.g. squirrels and `rgbif`?
